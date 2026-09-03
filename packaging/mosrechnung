@@ -1,0 +1,4 @@
+#!/bin/sh
+export PYTHONPATH="/usr/lib/mosrechnung${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m mosrechnung.app "$@"
+

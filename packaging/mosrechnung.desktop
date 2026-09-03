@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mosrechnung
+Comment=PDF-Rechnungen einfach erstellen
+Exec=mosrechnung
+Icon=mosrechnung
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=true
+

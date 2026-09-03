@@ -1,0 +1,10 @@
+Package: mosrechnung
+Version: @VERSION@
+Section: office
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-pyside6.qtcore | python3-pyside2.qtcore, python3-pyside6.qtgui | python3-pyside2.qtgui, python3-pyside6.qtwidgets | python3-pyside2.qtwidgets, python3-reportlab, python3-odf
+Maintainer: Mosrechnung <noreply@example.invalid>
+Description: Einfache native Anwendung fuer PDF-Rechnungen
+ Mosrechnung verwaltet Kunden und Leistungen lokal und erstellt professionelle,
+ mehrseitige PDF-Rechnungen. Alle Daten bleiben auf dem eigenen Computer.
