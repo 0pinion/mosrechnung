@@ -50,6 +50,25 @@ def test_round_trip_replaces_database(tmp_path):
     assert "company_vat_id" not in target.get_settings()
 
 
+def test_import_accepts_unusual_legacy_text(tmp_path):
+    source = populated_repository(tmp_path / "source.sqlite3")
+    path = export_backup(source, tmp_path / "backup.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    unusual_postal_code = "D-12345 / Postfach + Sonderbezirk (Altbestand)"
+    data["customers"][0]["postalCode"] = unusual_postal_code
+    data["customers"][0]["phone"] = 123456
+    data["invoices"][0]["customerAddress"] = "Historische Anschrift " * 300
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    target = Repository(tmp_path / "target.sqlite3")
+
+    import_backup(target, path)
+
+    customer = target.list_customers()[0]
+    assert customer.postal_code == unusual_postal_code
+    assert customer.phone == "123456"
+    assert len(target.list_invoices()[0].customer_address) > 2000
+
+
 def test_invalid_backup_does_not_change_database(tmp_path):
     repository = populated_repository(tmp_path / "data.sqlite3")
     path = tmp_path / "invalid.json"

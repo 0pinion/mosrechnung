@@ -119,10 +119,18 @@ def export_backup(repository: Repository, destination: str | Path) -> Path:
     return path
 
 
-def _text(value: Any, field: str, *, required: bool = False, maximum: int = 10_000) -> str:
-    if not isinstance(value, str) or len(value) > maximum or (required and not value.strip()):
+def _text(value: Any, field: str, *, maximum: int = MAX_BACKUP_BYTES) -> str:
+    if value is None:
+        text = ""
+    elif isinstance(value, str):
+        text = value
+    elif isinstance(value, (int, float, bool)):
+        text = str(value)
+    else:
         raise ValueError(f"Ungültiger Text im Backup: {field}.")
-    return value
+    if len(text) > maximum:
+        raise ValueError(f"Ungültiger Text im Backup: {field}.")
+    return text
 
 
 def _integer(value: Any, field: str, *, minimum: int = 0, maximum: int = 2**53 - 1) -> int:
@@ -155,12 +163,12 @@ def _validate(data: Any) -> dict[str, Any]:
         if not isinstance(customer, dict):
             raise ValueError("Ungültiger Kunde im Backup.")
         customer_id = _integer(customer.get("id"), "Kunden-ID", minimum=1)
-        name = _text(customer.get("name"), "Kundenname", required=True, maximum=500)
-        _text(customer.get("street"), "Straße", required=True, maximum=500)
-        _text(customer.get("postalCode"), "PLZ", required=True, maximum=20)
-        _text(customer.get("city"), "Ort", required=True, maximum=300)
-        _text(customer.get("phone", ""), "Telefon", maximum=100)
-        _text(customer.get("dogs", ""), "Hundename", maximum=500)
+        customer["name"] = name = _text(customer.get("name"), "Kundenname")
+        customer["street"] = _text(customer.get("street"), "Straße")
+        customer["postalCode"] = _text(customer.get("postalCode"), "PLZ")
+        customer["city"] = _text(customer.get("city"), "Ort")
+        customer["phone"] = _text(customer.get("phone", ""), "Telefon")
+        customer["dogs"] = _text(customer.get("dogs", ""), "Hundename")
         normalized = normalize_name(name)
         if customer_id in customer_ids or normalized in customer_names:
             raise ValueError("Das Backup enthält doppelte Kunden.")
@@ -172,7 +180,7 @@ def _validate(data: Any) -> dict[str, Any]:
         if not isinstance(service, dict):
             raise ValueError("Ungültige Leistung im Backup.")
         service_id = _integer(service.get("id"), "Leistungs-ID", minimum=1)
-        _text(service.get("description"), "Leistungsbezeichnung", required=True, maximum=2000)
+        service["description"] = _text(service.get("description"), "Leistungsbezeichnung")
         _integer(service.get("priceCents"), "Leistungspreis")
         if service_id in service_ids:
             raise ValueError("Das Backup enthält doppelte Leistungs-IDs.")
@@ -184,18 +192,19 @@ def _validate(data: Any) -> dict[str, Any]:
         if not isinstance(invoice, dict):
             raise ValueError("Ungültige Rechnung im Backup.")
         invoice_id = _integer(invoice.get("id"), "Rechnungs-ID", minimum=1)
-        number = _text(invoice.get("number"), "Rechnungsnummer", required=True, maximum=200).strip()
-        invoice_date = _text(invoice.get("invoiceDate"), "Rechnungsdatum", required=True, maximum=10)
+        invoice["number"] = _text(invoice.get("number"), "Rechnungsnummer")
+        number = invoice["number"].strip()
+        invoice_date = _text(invoice.get("invoiceDate"), "Rechnungsdatum", maximum=10)
         try:
             datetime.strptime(invoice_date, "%Y-%m-%d")
         except ValueError as exc:
             raise ValueError("Ungültiges Rechnungsdatum im Backup.") from exc
         if _integer(invoice.get("customerId"), "Kundenreferenz", minimum=1) not in customer_ids:
             raise ValueError("Eine Rechnung verweist auf einen fehlenden Kunden.")
-        _text(invoice.get("customerName"), "Rechnungskunde", required=True, maximum=500)
-        _text(invoice.get("customerAddress"), "Rechnungsanschrift", required=True, maximum=2000)
-        _text(invoice.get("customerPhone", ""), "Telefon", maximum=100)
-        _text(invoice.get("customerDogs", ""), "Hundename", maximum=500)
+        invoice["customerName"] = _text(invoice.get("customerName"), "Rechnungskunde")
+        invoice["customerAddress"] = _text(invoice.get("customerAddress"), "Rechnungsanschrift")
+        invoice["customerPhone"] = _text(invoice.get("customerPhone", ""), "Telefon")
+        invoice["customerDogs"] = _text(invoice.get("customerDogs", ""), "Hundename")
         _integer(invoice.get("taxRate"), "Steuersatz", maximum=100)
         items = _list(invoice.get("items"), "Rechnungspositionen", maximum=1000)
         if not items:
@@ -206,7 +215,7 @@ def _validate(data: Any) -> dict[str, Any]:
             service_id = item.get("serviceId")
             if service_id is not None:
                 _integer(service_id, "Leistungsreferenz", minimum=1)
-            _text(item.get("description"), "Position", required=True, maximum=5000)
+            item["description"] = _text(item.get("description"), "Position")
             _integer(item.get("quantity"), "Menge", minimum=1)
             _integer(item.get("unitPriceCents"), "Einzelpreis")
         if invoice_id in invoice_ids or number in invoice_numbers:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mosrechnung"
-version = "0.1.4"
+version = "0.1.5"
 description = "Einfache native Linux-Anwendung zur Erstellung von PDF-Rechnungen"
 requires-python = ">=3.10"
 dependencies = [

@@ -634,11 +634,11 @@ function requireArray(value, name, maximum = 100000) {
   return value;
 }
 
-function requireText(value, name, maximum = 10000, allowEmpty = true) {
-  if (typeof value !== "string" || value.length > maximum || (!allowEmpty && !value.trim())) {
-    throw new Error(`Ungültiger Text im Backup: ${name}.`);
-  }
-  return value;
+function requireText(value, name) {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  throw new Error(`Ungültiger Text im Backup: ${name}.`);
 }
 
 function requireId(value, name) {
@@ -654,18 +654,18 @@ function validateBackup(payload) {
   if (payload.version && payload.version > BACKUP_VERSION) throw new Error("Das Backup stammt aus einer neueren App-Version.");
   const customers = requireArray(payload.customers, "Kunden").map((entry, index) => ({
     id: requireId(entry?.id, `Kunde ${index + 1}`),
-    name: requireText(entry.name, "Kundenname", 500, false),
-    street: requireText(entry.street, "Straße", 500, false),
-    postalCode: requireText(entry.postalCode, "PLZ", 20, false),
-    city: requireText(entry.city, "Ort", 300, false),
-    phone: requireText(entry.phone || "", "Telefon", 100),
-    dogs: requireText(entry.dogs || "", "Hundename", 500),
+    name: requireText(entry.name, "Kundenname"),
+    street: requireText(entry.street, "Straße"),
+    postalCode: requireText(entry.postalCode, "PLZ"),
+    city: requireText(entry.city, "Ort"),
+    phone: requireText(entry.phone ?? "", "Telefon"),
+    dogs: requireText(entry.dogs ?? "", "Hundename"),
   }));
   const customerIds = new Set(customers.map((entry) => entry.id));
   if (customerIds.size !== customers.length) throw new Error("Das Backup enthält doppelte Kunden-IDs.");
   const services = requireArray(payload.services, "Leistungen").map((entry, index) => ({
     id: requireId(entry?.id, `Leistung ${index + 1}`),
-    description: requireText(entry.description, "Leistungsbezeichnung", 2000, false),
+    description: requireText(entry.description, "Leistungsbezeichnung"),
     priceCents: requireNonnegativeInteger(entry.priceCents, "Leistungspreis"),
   }));
   const serviceIds = new Set(services.map((entry) => entry.id));
@@ -678,7 +678,7 @@ function validateBackup(payload) {
       const unitPriceCents = requireNonnegativeInteger(item.unitPriceCents, "Einzelpreis");
       return {
         serviceId: item.serviceId == null ? null : requireId(item.serviceId, "Leistungsreferenz"),
-        description: requireText(item.description, "Position", 5000, false),
+        description: requireText(item.description, "Position"),
         quantity,
         unitPriceCents,
         totalCents: quantity * unitPriceCents,
@@ -688,18 +688,18 @@ function validateBackup(payload) {
     const totals = calculateTotals(items, requireNonnegativeInteger(entry.taxRate, "Steuersatz", 100));
     return {
       id,
-      number: requireText(entry.number, "Rechnungsnummer", 200, false),
+      number: requireText(entry.number, "Rechnungsnummer"),
       invoiceDate: entry.invoiceDate,
       customerId: requireId(entry.customerId, "Kundenreferenz"),
-      customerName: requireText(entry.customerName, "Rechnungskunde", 500, false),
-      customerAddress: requireText(entry.customerAddress, "Rechnungsanschrift", 2000, false),
-      customerPhone: requireText(entry.customerPhone || "", "Telefon", 100),
-      customerDogs: requireText(entry.customerDogs || "", "Hundename", 500),
+      customerName: requireText(entry.customerName, "Rechnungskunde"),
+      customerAddress: requireText(entry.customerAddress, "Rechnungsanschrift"),
+      customerPhone: requireText(entry.customerPhone ?? "", "Telefon"),
+      customerDogs: requireText(entry.customerDogs ?? "", "Hundename"),
       items,
       taxRate: entry.taxRate,
       ...totals,
-      createdAt: requireText(entry.createdAt || "", "Erstellzeit", 100),
-      updatedAt: requireText(entry.updatedAt || "", "Änderungszeit", 100),
+      createdAt: requireText(entry.createdAt ?? "", "Erstellzeit"),
+      updatedAt: requireText(entry.updatedAt ?? "", "Änderungszeit"),
     };
   });
   const invoiceIds = new Set(invoices.map((entry) => entry.id));
@@ -726,7 +726,7 @@ function validateSettings(value) {
     if (!(key in value)) continue;
     if (key === "nextInvoiceNumber") settings[key] = requirePositiveInteger(value[key], "nächste Rechnungsnummer");
     else if (key === "taxRate") settings[key] = requireNonnegativeInteger(value[key], "Steuersatz", 100);
-    else settings[key] = requireText(value[key], key, key === "companyLogo" ? 10 * 1024 * 1024 : 10000);
+    else settings[key] = requireText(value[key], key);
   }
   if (settings.companyLogo && !/^data:image\/(png|jpeg|webp);base64,/i.test(settings.companyLogo)) {
     throw new Error("Das Logo im Backup hat ein nicht erlaubtes Format.");
