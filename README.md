@@ -81,7 +81,7 @@ benötigt:
 ```sh
 sudo apt install dpkg-dev python3-reportlab python3-odf
 ./packaging/build-deb.sh
-sudo apt install ./dist/mosrechnung_0.1.0_all.deb
+sudo apt install ./dist/mosrechnung_0.1.3_all.deb
 ```
 
 Das Paket bevorzugt PySide6 auf Ubuntu 26.04 und neuer. Auf Ubuntu 22.04 und
