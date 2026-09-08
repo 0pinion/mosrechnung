@@ -12,6 +12,16 @@ def repository(tmp_path):
     return Repository(tmp_path / "test.sqlite3")
 
 
+def test_obsolete_vat_id_setting_is_removed(tmp_path):
+    path = tmp_path / "settings.sqlite3"
+    repository = Repository(path)
+    repository.save_settings({"company_vat_id": "DE123456789"})
+
+    reopened = Repository(path)
+
+    assert "company_vat_id" not in reopened.get_settings()
+
+
 def test_customer_deduplication_and_enrichment(repository):
     repository.save_customer(Customer("  Anna   Müller ", "Dorfstraße 1", "12345", "Dorf"))
     outcome = repository.merge_imported_customer(

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-PACKAGE_VERSION="${1:-0.1.3}"
+PACKAGE_VERSION="${1:-0.1.4}"
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 STAGING_DIR=$(mktemp -d)
 PACKAGE_ROOT="$STAGING_DIR/mosrechnung"

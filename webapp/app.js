@@ -13,7 +13,6 @@ const DEFAULT_SETTINGS = {
   companyBic: "",
   companyTaxOffice: "",
   companyTaxNumber: "",
-  companyVatId: "",
   companyPhone: "",
   companyEmail: "",
   companyLogo: "",
@@ -28,6 +27,7 @@ const state = {
   services: [],
   invoices: [],
   settings: { ...DEFAULT_SETTINGS },
+  selectedInvoiceIds: new Set(),
 };
 
 const moneyFormatter = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
@@ -86,7 +86,12 @@ function remove(name, id) {
 function getSettings() {
   return new Promise((resolve, reject) => {
     const request = store("settings").get("settings");
-    request.onsuccess = () => resolve({ ...DEFAULT_SETTINGS, ...(request.result?.value || {}) });
+    request.onsuccess = () => {
+      const stored = request.result?.value || {};
+      resolve(Object.fromEntries(
+        Object.entries(DEFAULT_SETTINGS).map(([key, fallback]) => [key, key in stored ? stored[key] : fallback]),
+      ));
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -145,6 +150,10 @@ async function loadState() {
   state.customers = (await getAll("customers")).sort((a, b) => a.name.localeCompare(b.name, "de"));
   state.services = (await getAll("services")).sort((a, b) => a.description.localeCompare(b.description, "de"));
   state.invoices = (await getAll("invoices")).sort((a, b) => String(b.invoiceDate).localeCompare(String(a.invoiceDate)) || b.id - a.id);
+  const invoiceIds = new Set(state.invoices.map((invoice) => Number(invoice.id)));
+  state.selectedInvoiceIds.forEach((id) => {
+    if (!invoiceIds.has(id)) state.selectedInvoiceIds.delete(id);
+  });
 }
 
 function customerAddress(customer) {
@@ -194,16 +203,36 @@ function renderServices() {
   `).join("") || `<p class="muted">Noch keine Leistungen angelegt.</p>`;
 }
 
-function renderInvoices() {
+function visibleInvoices() {
   const query = normalize(document.querySelector("#invoiceSearch").value);
-  const list = document.querySelector("#invoiceList");
-  const invoices = state.invoices.filter((invoice) => {
+  return state.invoices.filter((invoice) => {
     return !query || normalize(`${invoice.number} ${invoice.customerName}`).includes(query);
   });
+}
+
+function renderInvoiceAnalysis() {
+  const selected = state.invoices.filter((invoice) => state.selectedInvoiceIds.has(Number(invoice.id)));
+  const count = selected.length;
+  const totalCents = selected.reduce((sum, invoice) => sum + Number(invoice.totalCents || 0), 0);
+  document.querySelector("#invoiceSelectionCount").textContent =
+    `${count} ${count === 1 ? "Rechnung" : "Rechnungen"} markiert`;
+  document.querySelector("#invoiceSelectionTotal").textContent = money(totalCents);
+  document.querySelector("#clearInvoiceSelection").disabled = count === 0;
+  document.querySelector("#selectVisibleInvoices").disabled = visibleInvoices().length === 0;
+}
+
+function renderInvoices() {
+  const list = document.querySelector("#invoiceList");
+  const invoices = visibleInvoices();
   list.innerHTML = invoices.map((invoice) => `
     <article class="card">
       <div class="card-title">
-        <strong>${escapeHtml(invoice.number)}</strong>
+        <label class="invoice-selector">
+          <input type="checkbox" data-select-invoice="${invoice.id}"
+                 aria-label="Rechnung ${escapeHtml(invoice.number)} markieren"
+                 ${state.selectedInvoiceIds.has(Number(invoice.id)) ? "checked" : ""}>
+          <strong>${escapeHtml(invoice.number)}</strong>
+        </label>
         <span>${money(invoice.totalCents)}</span>
       </div>
       <div>${escapeHtml(invoice.customerName)}</div>
@@ -215,6 +244,7 @@ function renderInvoices() {
       </div>
     </article>
   `).join("") || `<p class="muted">Noch keine Rechnungen angelegt.</p>`;
+  renderInvoiceAnalysis();
 }
 
 function renderSettings() {
@@ -515,7 +545,7 @@ function renderInvoicePrint(invoice) {
   const missing = [
     ["companyName", "Firmenname"],
     ["companyIban", "IBAN"],
-    ["companyVatId", "Umsatzsteuer-ID"],
+    ["companyTaxNumber", "Steuernummer"],
   ].filter(([key]) => !String(settings[key] || "").trim());
   if (missing.length) {
     alert(`Bitte zuerst Einstellungen ausfuellen: ${missing.map((entry) => entry[1]).join(", ")}`);
@@ -559,7 +589,7 @@ function renderInvoicePrint(invoice) {
       <footer class="print-footer">
         <span>${escapeHtml(settings.companyName)}</span>
         <span>IBAN ${escapeHtml(settings.companyIban)}</span>
-        <span>USt-IdNr. ${escapeHtml(settings.companyVatId)}</span>
+        <span>Steuernummer ${escapeHtml(settings.companyTaxNumber)}</span>
       </footer>
     </article>
   `;
@@ -739,6 +769,14 @@ function attachEvents() {
   document.querySelector("#addInvoiceItem").addEventListener("click", () => addInvoiceItem());
   document.querySelector("#customerSearch").addEventListener("input", renderCustomers);
   document.querySelector("#invoiceSearch").addEventListener("input", renderInvoices);
+  document.querySelector("#selectVisibleInvoices").addEventListener("click", () => {
+    visibleInvoices().forEach((invoice) => state.selectedInvoiceIds.add(Number(invoice.id)));
+    renderInvoices();
+  });
+  document.querySelector("#clearInvoiceSelection").addEventListener("click", () => {
+    state.selectedInvoiceIds.clear();
+    renderInvoices();
+  });
   document.querySelector("#customerForm").addEventListener("submit", saveCustomer);
   document.querySelector("#serviceForm").addEventListener("submit", saveService);
   document.querySelector("#invoiceForm").addEventListener("submit", saveInvoice);
@@ -765,6 +803,14 @@ function attachEvents() {
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => closeDialog(button.closest("dialog")));
+  });
+  document.body.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.dataset.selectInvoice) return;
+    const invoiceId = Number(target.dataset.selectInvoice);
+    if (target.checked) state.selectedInvoiceIds.add(invoiceId);
+    else state.selectedInvoiceIds.delete(invoiceId);
+    renderInvoiceAnalysis();
   });
   document.body.addEventListener("click", async (event) => {
     const target = event.target;
@@ -795,6 +841,7 @@ function attachEvents() {
       await loadState();
       renderAll();
     } else if (target.dataset.deleteInvoice && confirm("Rechnung wirklich loeschen?")) {
+      state.selectedInvoiceIds.delete(Number(target.dataset.deleteInvoice));
       await remove("invoices", target.dataset.deleteInvoice);
       await loadState();
       renderAll();
@@ -817,6 +864,7 @@ async function main() {
     }
   }
   await loadState();
+  await saveSettings(state.settings);
   renderAll();
 }
 

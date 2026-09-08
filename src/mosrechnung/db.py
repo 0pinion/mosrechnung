@@ -20,7 +20,6 @@ DEFAULT_SETTINGS = {
     "company_bic": "",
     "company_tax_office": "",
     "company_tax_number": "",
-    "company_vat_id": "",
     "company_phone": "",
     "company_email": "",
     "company_logo": "",
@@ -125,6 +124,7 @@ class Repository:
                 "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
                 DEFAULT_SETTINGS.items(),
             )
+            connection.execute("DELETE FROM settings WHERE key = 'company_vat_id'")
             customer_columns = {
                 row["name"] for row in connection.execute("PRAGMA table_info(customers)")
             }

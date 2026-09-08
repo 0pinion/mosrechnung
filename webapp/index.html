@@ -48,6 +48,16 @@
         <input id="invoiceSearch" type="search" placeholder="Rechnung oder Kunde suchen">
         <button id="newInvoice" type="button">Neue Rechnung</button>
       </div>
+      <section id="invoiceAnalysis" class="invoice-analysis" aria-live="polite">
+        <div class="invoice-analysis-total">
+          <span id="invoiceSelectionCount">0 Rechnungen markiert</span>
+          <strong id="invoiceSelectionTotal">0,00 €</strong>
+        </div>
+        <div class="invoice-analysis-actions">
+          <button id="selectVisibleInvoices" type="button">Sichtbare markieren</button>
+          <button id="clearInvoiceSelection" type="button" disabled>Auswahl leeren</button>
+        </div>
+      </section>
       <div id="invoiceList" class="list"></div>
     </section>
 
@@ -72,7 +82,6 @@
         <label>BIC *<input name="companyBic" required></label>
         <label>Finanzamt *<input name="companyTaxOffice" required></label>
         <label>Steuernummer *<input name="companyTaxNumber" required></label>
-        <label>Umsatzsteuer-ID *<input name="companyVatId" required></label>
         <label>Telefon<input name="companyPhone"></label>
         <label>E-Mail<input name="companyEmail" type="email"></label>
         <label>Logo<input name="companyLogo" type="file" accept="image/*"></label>
