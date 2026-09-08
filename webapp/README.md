@@ -49,7 +49,13 @@ Danach kann die Seite in Safari ueber Teilen > Zum Home-Bildschirm als App-Symbo
 
 ## Veröffentlichung
 
-Der GitHub-Actions-Workflow veröffentlicht Änderungen an `webapp/` automatisch auf GitHub Pages. Im Repository muss einmal unter **Settings → Pages → Source** die Quelle **GitHub Actions** gewählt werden.
+Die veröffentlichte App ist erreichbar unter:
+
+<https://0pinion.github.io/mosrechnung/>
+
+Der GitHub-Actions-Workflow veröffentlicht Änderungen an `webapp/` automatisch auf GitHub Pages. Die Quelle **GitHub Actions** ist im Repository bereits aktiviert. Künftige Änderungen werden nach einem Push auf den Branch `main` automatisch veröffentlicht.
+
+Auf dem iPhone die Adresse einmal in Safari öffnen und dann **Teilen → Zum Home-Bildschirm** wählen. Danach startet MosRechnung wie eine App und ist durch den Service Worker auch ohne Netzwerkverbindung verfügbar. Für Aktualisierungen die App bei bestehender Internetverbindung einmal neu öffnen.
 
 Cloudflare Pages kann alternativ das Repository direkt verwenden:
 
