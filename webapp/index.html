@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MosRechnung">
+  <meta name="theme-color" content="#f7f8fa">
+  <meta name="referrer" content="no-referrer">
+  <link rel="apple-touch-icon" href="icon.png">
+  <title>MosRechnung</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>MosRechnung</h1>
+      <p>Lokale Rechnungsverwaltung</p>
+    </div>
+    <div class="header-actions">
+      <span id="connectionStatus" class="status" role="status">Lokal</span>
+      <button id="exportData" type="button">Backup sichern</button>
+      <button id="chooseImport" type="button">Backup einlesen</button>
+      <input id="importData" class="visually-hidden" type="file" accept="application/json,.json">
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Bereiche">
+    <button class="tab active" type="button" data-view="customers">Kunden</button>
+    <button class="tab" type="button" data-view="invoices">Rechnungen</button>
+    <button class="tab" type="button" data-view="services">Leistungen</button>
+    <button class="tab" type="button" data-view="settings">Einstellungen</button>
+  </nav>
+
+  <main>
+    <section id="customers" class="view active">
+      <div class="toolbar">
+        <input id="customerSearch" type="search" placeholder="Kunden oder Hund suchen">
+        <button id="newCustomer" type="button">Neuer Kunde</button>
+      </div>
+      <div id="customerList" class="list"></div>
+    </section>
+
+    <section id="invoices" class="view">
+      <div class="toolbar">
+        <input id="invoiceSearch" type="search" placeholder="Rechnung oder Kunde suchen">
+        <button id="newInvoice" type="button">Neue Rechnung</button>
+      </div>
+      <div id="invoiceList" class="list"></div>
+    </section>
+
+    <section id="services" class="view">
+      <div class="toolbar">
+        <button id="newService" type="button">Neue Leistung</button>
+      </div>
+      <div id="serviceList" class="list"></div>
+    </section>
+
+    <section id="settings" class="view">
+      <aside class="privacy-note">
+        <strong>Datenschutz:</strong> Alle Kunden- und Rechnungsdaten bleiben ausschließlich
+        in diesem Browser. Der Webserver erhält keine dieser Daten. Sichere regelmäßig ein
+        Backup in der Dateien-App; Safari-Daten zu löschen entfernt auch die lokalen App-Daten.
+      </aside>
+      <form id="settingsForm" class="card form-grid">
+        <label>Name *<input name="companyName" required></label>
+        <label>Anschrift *<textarea name="companyAddress" required rows="3"></textarea></label>
+        <label>Firmensitz *<input name="companySeat" required></label>
+        <label>IBAN *<input name="companyIban" required></label>
+        <label>BIC *<input name="companyBic" required></label>
+        <label>Finanzamt *<input name="companyTaxOffice" required></label>
+        <label>Steuernummer *<input name="companyTaxNumber" required></label>
+        <label>Telefon<input name="companyPhone"></label>
+        <label>E-Mail<input name="companyEmail" type="email"></label>
+        <label>Logo<input name="companyLogo" type="file" accept="image/*"></label>
+        <label>Nummernformat<input name="invoicePattern" required></label>
+        <label>Nächste Nummer<input name="nextInvoiceNumber" type="number" min="1" required></label>
+        <label>Umsatzsteuer %<input name="taxRate" type="number" min="0" max="100" required></label>
+        <button type="submit">Einstellungen speichern</button>
+      </form>
+    </section>
+  </main>
+
+  <dialog id="customerDialog">
+    <form method="dialog" id="customerForm" class="form-grid">
+      <h2>Kunde</h2>
+      <input name="id" type="hidden">
+      <label>Name *<input name="name" required></label>
+      <label>Straße + Hausnummer *<input name="street" required></label>
+      <label>PLZ *<input name="postalCode" required></label>
+      <label>Ort *<input name="city" required></label>
+      <label>Telefon<input name="phone"></label>
+      <label>Hundename(n)<input name="dogs"></label>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" data-close>Abbrechen</button>
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="serviceDialog">
+    <form method="dialog" id="serviceForm" class="form-grid">
+      <h2>Leistung</h2>
+      <input name="id" type="hidden">
+      <label>Bezeichnung *<input name="description" required></label>
+      <label>Standardpreis netto *<input name="price" inputmode="decimal" required></label>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" data-close>Abbrechen</button>
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="invoiceDialog" class="wide-dialog">
+    <form method="dialog" id="invoiceForm">
+      <h2>Rechnung</h2>
+      <input name="id" type="hidden">
+      <div class="form-grid">
+        <label class="customer-picker">Kunde suchen *
+          <input name="customerSearch" type="search" autocomplete="off"
+                 placeholder="Name oder Hundename eingeben" required list="customerSuggestions">
+          <input name="customerId" type="hidden">
+          <datalist id="customerSuggestions"></datalist>
+          <small>Vollständigen Namen eingeben oder einen Treffer bestätigen.</small>
+        </label>
+        <label>Rechnungsnummer *<input name="number" required></label>
+        <label>Datum *<input name="invoiceDate" type="date" required></label>
+      </div>
+      <div class="items-header">
+        <h3>Positionen</h3>
+        <button id="addInvoiceItem" type="button">Position hinzufügen</button>
+      </div>
+      <div id="invoiceItems"></div>
+      <p id="invoiceTotal" class="total-line">Netto: 0,00 € · USt.: 0,00 € · Brutto: 0,00 €</p>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" data-close>Abbrechen</button>
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="invoiceItemTemplate">
+    <div class="invoice-item">
+      <select name="serviceId" aria-label="Leistung"></select>
+      <input name="description" placeholder="Bezeichnung" required>
+      <input name="quantity" aria-label="Anzahl" type="number" min="1" value="1" required>
+      <input name="unitPrice" inputmode="decimal" placeholder="0,00" required>
+      <button type="button" data-remove>Entfernen</button>
+    </div>
+  </template>
+
+  <section id="printArea" aria-hidden="true"></section>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

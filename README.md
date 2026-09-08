@@ -16,6 +16,23 @@ ReportLab erzeugt.
 - automatische Netto-, Umsatzsteuer- und Bruttoberechnung mit gespeichertem Steuersatz
 - mehrseitige PDF-Rechnungen mit wiederholten Tabellenköpfen und Seitenzahlen
 - Rechnungshistorie, nachträgliche Bearbeitung und erneute PDF-Erzeugung
+- gemeinsames JSON-Backup für Datenaustausch mit der iPhone-WebApp
+
+## Backup und iPhone-WebApp
+
+Unter **Daten → Backup sichern …** wird ein versioniertes JSON-Backup mit Kunden,
+Leistungen, Rechnungen, Firmendaten und Logo erstellt. Diese Datei kann in der
+iPhone-WebApp über **Backup einlesen** vollständig wiederhergestellt werden.
+
+Umgekehrt lassen sich Backups der WebApp unter **Daten → Backup einlesen …** in
+die Python-Anwendung übernehmen. Der Import prüft zuerst die komplette Datei und
+ersetzt anschließend Kunden, Leistungen und Rechnungen innerhalb einer einzigen
+Datenbanktransaktion. Python-spezifische Einstellungen wie PDF-Ausgabeverzeichnis
+und Calc-Zelladressen bleiben dabei erhalten.
+
+Die Backup-Datei enthält personenbezogene Daten unverschlüsselt. Sie sollte nur
+in einem durch das Betriebssystem geschützten Speicher liegen und weder in das
+öffentliche GitHub-Repository eingecheckt noch ungeschützt versendet werden.
 
 ## Entwicklung
 

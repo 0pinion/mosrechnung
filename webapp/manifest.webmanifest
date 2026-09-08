@@ -1,0 +1,13 @@
+{
+  "name": "MosRechnung",
+  "short_name": "MosRechnung",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#f7f8fa",
+  "icons": [
+    { "src": "icon.png", "sizes": "423x512", "type": "image/png", "purpose": "any" }
+  ]
+}

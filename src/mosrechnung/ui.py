@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 
 try:
     from PySide6.QtCore import QAbstractTableModel, QDate, QModelIndex, Qt, QTimer, QUrl, Signal
@@ -26,6 +27,7 @@ except ImportError:  # Ubuntu 22.04/24.04 liefern PySide2 statt PySide6.
     )
 
 from .db import DuplicateInvoiceNumberError, Repository
+from .backup import export_backup, import_backup
 from .models import Customer, Invoice, InvoiceItem, Service
 from .money import cents_to_text, text_to_cents
 from .ods_import import import_customers, parse_cell_address
@@ -113,6 +115,7 @@ class CustomerTableModel(QAbstractTableModel):
 
 class CustomersWidget(QWidget):
     customers_changed = Signal()
+    invoice_created = Signal()
 
     def __init__(self, repository: Repository):
         super().__init__()
@@ -129,11 +132,24 @@ class CustomersWidget(QWidget):
         self.search.textChanged.connect(lambda _text: self.search_timer.start())
         add = QPushButton("Neuer Kunde")
         add.clicked.connect(self.add_customer)
+        add.setObjectName("primaryButton")
+        self.new_invoice_button = QPushButton("Neue Rechnung")
+        self.new_invoice_button.clicked.connect(self.new_invoice)
+        self.new_invoice_button.setEnabled(False)
+        self.edit_button = QPushButton("Bearbeiten")
+        self.edit_button.clicked.connect(self.edit_customer)
+        self.edit_button.setEnabled(False)
         import_button = QPushButton("Aus Calc importieren …")
         import_button.clicked.connect(self.import_ods)
+        self.delete_button = QPushButton("Löschen")
+        self.delete_button.clicked.connect(self.delete_customer)
+        self.delete_button.setEnabled(False)
         top.addWidget(self.search, 1)
-        top.addWidget(import_button)
         top.addWidget(add)
+        top.addWidget(self.edit_button)
+        top.addWidget(self.new_invoice_button)
+        top.addWidget(import_button)
+        top.addWidget(self.delete_button)
         layout.addLayout(top)
         self.table = QTableView()
         self.model = CustomerTableModel()
@@ -147,16 +163,8 @@ class CustomersWidget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table.doubleClicked.connect(self.edit_customer)
+        self.table.selectionModel().selectionChanged.connect(self._selection_changed)
         layout.addWidget(self.table, 1)
-        actions = QHBoxLayout()
-        edit = QPushButton("Bearbeiten")
-        edit.clicked.connect(self.edit_customer)
-        delete = QPushButton("Löschen")
-        delete.clicked.connect(self.delete_customer)
-        actions.addStretch()
-        actions.addWidget(edit)
-        actions.addWidget(delete)
-        layout.addLayout(actions)
         self._customers: list[Customer] = []
         self._loaded = False
 
@@ -167,11 +175,27 @@ class CustomersWidget(QWidget):
     def refresh(self) -> None:
         self._customers = self.repository.list_customers(self.search.text())
         self.model.replace(self._customers)
+        self._selection_changed()
         self._loaded = True
 
     def _selected(self) -> Customer | None:
         row = self.table.currentIndex().row()
         return self._customers[row] if 0 <= row < len(self._customers) else None
+
+    def _selection_changed(self) -> None:
+        selected = self._selected() is not None
+        self.edit_button.setEnabled(selected)
+        self.new_invoice_button.setEnabled(selected)
+        self.delete_button.setEnabled(selected)
+
+    def new_invoice(self) -> None:
+        customer = self._selected()
+        if not customer:
+            show_error(self, "Kein Kunde ausgewählt", "Bitte zuerst einen Kunden in der Liste auswählen.")
+            return
+        dialog = InvoiceDialog(self, self.repository, customer_id=customer.id)
+        if dialog.exec() == QDialog.Accepted:
+            self.invoice_created.emit()
 
     def add_customer(self) -> None:
         dialog = CustomerDialog(self)
@@ -512,10 +536,14 @@ class SettingsWidget(QScrollArea):
 
 
 class InvoiceDialog(QDialog):
-    def __init__(self, parent: QWidget, repository: Repository, invoice: Invoice | None = None):
+    def __init__(
+        self, parent: QWidget, repository: Repository, invoice: Invoice | None = None,
+        customer_id: int | None = None,
+    ):
         super().__init__(parent)
         self.repository = repository
         self.invoice = invoice
+        self.initial_customer_id = customer_id
         self.saved_invoice: Invoice | None = None
         self.setWindowTitle("Rechnung bearbeiten" if invoice else "Neue Rechnung")
         self.resize(900, 650)
@@ -572,7 +600,7 @@ class InvoiceDialog(QDialog):
         self._load_invoice()
 
     def _load_customers(self) -> None:
-        current_id = self.invoice.customer_id if self.invoice else None
+        current_id = self.invoice.customer_id if self.invoice else self.initial_customer_id
         self.customer_combo.clear()
         selected = -1
         for index, customer in enumerate(self.repository.list_customers()):
@@ -780,8 +808,24 @@ class InvoicesWidget(QWidget):
         new_invoice = QPushButton("Neue Rechnung")
         new_invoice.setObjectName("primaryButton")
         new_invoice.clicked.connect(self.new_invoice)
+        self.edit_button = QPushButton("Bearbeiten")
+        self.edit_button.clicked.connect(self.edit_invoice)
+        self.open_pdf_button = QPushButton("PDF öffnen")
+        self.open_pdf_button.clicked.connect(self.open_pdf)
+        self.whatsapp_button = QPushButton("Über WhatsApp teilen")
+        self.whatsapp_button.clicked.connect(self.share_whatsapp)
+        self.regenerate_button = QPushButton("PDF neu erzeugen")
+        self.regenerate_button.clicked.connect(self.regenerate_pdf)
+        for button in (
+            self.edit_button, self.open_pdf_button, self.whatsapp_button, self.regenerate_button,
+        ):
+            button.setEnabled(False)
         top.addWidget(self.search, 1)
         top.addWidget(new_invoice)
+        top.addWidget(self.edit_button)
+        top.addWidget(self.open_pdf_button)
+        top.addWidget(self.whatsapp_button)
+        top.addWidget(self.regenerate_button)
         layout.addLayout(top)
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Rechnungsnummer", "Datum", "Kunde", "Betrag", "PDF"])
@@ -795,19 +839,8 @@ class InvoicesWidget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.table.doubleClicked.connect(self.edit_invoice)
+        self.table.itemSelectionChanged.connect(self._selection_changed)
         layout.addWidget(self.table, 1)
-        actions = QHBoxLayout()
-        edit = QPushButton("Bearbeiten")
-        edit.clicked.connect(self.edit_invoice)
-        regenerate = QPushButton("PDF neu erzeugen")
-        regenerate.clicked.connect(self.regenerate_pdf)
-        open_pdf = QPushButton("PDF öffnen")
-        open_pdf.clicked.connect(self.open_pdf)
-        actions.addStretch()
-        actions.addWidget(edit)
-        actions.addWidget(regenerate)
-        actions.addWidget(open_pdf)
-        layout.addLayout(actions)
         self._invoices: list[Invoice] = []
         self.refresh()
 
@@ -824,10 +857,20 @@ class InvoicesWidget(QWidget):
                 if column == 3:
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.table.setItem(row, column, item)
+        self._selection_changed()
 
     def _selected(self) -> Invoice | None:
         row = self.table.currentRow()
         return self._invoices[row] if 0 <= row < len(self._invoices) else None
+
+    def _selection_changed(self) -> None:
+        invoice = self._selected()
+        selected = invoice is not None
+        has_pdf = bool(invoice and invoice.pdf_path and Path(invoice.pdf_path).is_file())
+        self.edit_button.setEnabled(selected)
+        self.regenerate_button.setEnabled(selected)
+        self.open_pdf_button.setEnabled(has_pdf)
+        self.whatsapp_button.setEnabled(has_pdf)
 
     def new_invoice(self) -> None:
         if not self.repository.list_customers():
@@ -869,10 +912,35 @@ class InvoicesWidget(QWidget):
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
+    def share_whatsapp(self) -> None:
+        invoice = self._selected()
+        if not invoice:
+            return
+        path = Path(invoice.pdf_path) if invoice.pdf_path else None
+        if not path or not path.is_file():
+            show_error(self, "PDF nicht gefunden", "Bitte das PDF zuerst neu erzeugen.")
+            return
+        company_name = self.repository.get_settings().get("company_name", "").strip()
+        message = f"Rechnung {invoice.number}"
+        if company_name:
+            message += f" von {company_name}"
+        message += f" über {cents_to_text(invoice.total_cents, True)}"
+        QDesktopServices.openUrl(QUrl(f"https://wa.me/?text={quote(message)}"))
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.parent)))
+        QApplication.clipboard().setText(str(path))
+        QMessageBox.information(
+            self,
+            "PDF über WhatsApp teilen",
+            f"WhatsApp Web und der PDF-Ordner wurden geöffnet.\n\n"
+            f"Wähle in WhatsApp den Kontakt und füge über die Büroklammer diese Datei hinzu:\n{path.name}\n\n"
+            "Der vollständige Dateipfad wurde außerdem in die Zwischenablage kopiert.",
+        )
+
 
 class MainWindow(QMainWindow):
     def __init__(self, repository: Repository):
         super().__init__()
+        self.repository = repository
         self.setWindowTitle("Mosrechnung")
         self.resize(1050, 720)
         self.tabs = QTabWidget()
@@ -882,12 +950,59 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.invoices, "Rechnungen")
         self.tabs.addTab(self.customers, "Kunden")
         self.tabs.addTab(self.settings, "Einstellungen")
+        self.customers.invoice_created.connect(self.invoices.refresh)
         self.tabs.currentChanged.connect(self._tab_changed)
         self.setCentralWidget(self.tabs)
+        data_menu = self.menuBar().addMenu("Daten")
+        export_action = data_menu.addAction("Backup sichern …")
+        export_action.triggered.connect(self.export_data)
+        import_action = data_menu.addAction("Backup einlesen …")
+        import_action.triggered.connect(self.import_data)
 
     def _tab_changed(self, index: int) -> None:
         if self.tabs.widget(index) is self.customers:
             self.customers.ensure_loaded()
+
+    def export_data(self) -> None:
+        suggested = str(Path.home() / f"mosrechnung-backup-{date.today().isoformat()}.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Backup sichern", suggested, "Mosrechnung-Backup (*.json)"
+        )
+        if not path:
+            return
+        if not path.casefold().endswith(".json"):
+            path += ".json"
+        try:
+            export_backup(self.repository, path)
+        except Exception as exc:
+            show_error(self, "Backup konnte nicht erstellt werden", exc)
+            return
+        QMessageBox.information(self, "Backup erstellt", f"Das Backup wurde gespeichert:\n{path}")
+
+    def import_data(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Backup einlesen", "", "Mosrechnung-Backup (*.json)"
+        )
+        if not path:
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Datenbestand ersetzen",
+            "Der aktuelle lokale Datenbestand wird vollständig durch das Backup ersetzt. Fortfahren?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            import_backup(self.repository, path)
+        except Exception as exc:
+            show_error(self, "Backup konnte nicht eingelesen werden", exc)
+            return
+        self.customers.refresh()
+        self.invoices.refresh()
+        self.settings.load()
+        QMessageBox.information(self, "Backup eingelesen", "Der Datenbestand wurde vollständig wiederhergestellt.")
 
 
 STYLE = """
@@ -896,10 +1011,10 @@ QMainWindow { background: #f7f8f9; }
 QTabWidget::pane { border: 0; background: white; }
 QTabBar::tab { padding: 10px 22px; }
 QTabBar::tab:selected { color: #1f4e5f; border-bottom: 2px solid #1f4e5f; }
-QPushButton { padding: 7px 13px; }
+QPushButton { min-height: 24px; padding: 9px 16px; }
 QPushButton#primaryButton { background: #1f4e5f; color: white; border: 0; border-radius: 3px; }
-QLineEdit, QTextEdit, QComboBox, QDateEdit, QSpinBox { padding: 5px; }
-QTableWidget { border: 1px solid #d7dee2; gridline-color: #e8ecee; }
+QLineEdit, QTextEdit, QComboBox, QDateEdit, QSpinBox { min-height: 22px; padding: 6px; }
+QTableWidget, QTableView { border: 1px solid #d7dee2; gridline-color: #e8ecee; }
 QHeaderView::section { background: #eef2f4; padding: 7px; border: 0; border-bottom: 1px solid #d7dee2; }
 QLabel#invoiceTotal { font-size: 18px; font-weight: bold; color: #1f4e5f; padding: 8px; }
 QGroupBox { font-weight: bold; margin-top: 12px; padding-top: 12px; }
