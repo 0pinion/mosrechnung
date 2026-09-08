@@ -272,10 +272,16 @@ dialog h3 {
 
 .invoice-item {
   display: grid;
-  grid-template-columns: 1.1fr 1.8fr 80px 110px auto;
+  grid-template-columns: minmax(0, 1fr) 80px 110px auto;
   gap: 8px;
   align-items: start;
 }
+
+.invoice-item select { grid-column: 1; grid-row: 1; }
+.invoice-item input[name="description"] { grid-column: 1 / -1; grid-row: 2; }
+.invoice-item input[name="quantity"] { grid-column: 2; grid-row: 1; }
+.invoice-item input[name="unitPrice"] { grid-column: 3; grid-row: 1; }
+.invoice-item button[data-remove] { grid-column: 4; grid-row: 1; }
 
 .total-line {
   text-align: right;
@@ -401,11 +407,21 @@ dialog h3 {
 
   .invoice-item select,
   .invoice-item input[name="description"] { grid-column: 1 / -1; }
-  .invoice-item button[data-remove] { grid-column: 1 / -1; min-height: 36px; }
+  .invoice-item select { grid-row: 1; }
+  .invoice-item input[name="description"] { grid-row: 2; }
+  .invoice-item input[name="quantity"] { grid-column: 1; grid-row: 3; }
+  .invoice-item input[name="unitPrice"] { grid-column: 2; grid-row: 3; }
+  .invoice-item button[data-remove] { grid-column: 1 / -1; grid-row: 4; min-height: 36px; }
   .total-line { margin: 8px 0; text-align: left; }
 }
 
+@page {
+  size: A4;
+  margin: 18mm 20mm 24mm;
+}
+
 @media print {
+
   body > :not(#printArea) {
     display: none !important;
   }
@@ -417,21 +433,7 @@ dialog h3 {
   .invoice-print {
     color: #202124;
     font-family: Helvetica, Arial, sans-serif;
-    padding: 10mm 14mm;
-  }
-
-  .print-header {
-    display: grid;
-    grid-template-columns: 1fr 45mm;
-    align-items: start;
-    gap: 20mm;
-    margin-bottom: 18mm;
-  }
-
-  .print-logo {
-    max-width: 45mm;
-    max-height: 45mm;
-    justify-self: end;
+    padding: 0 0 14mm;
   }
 
   .print-recipient {
@@ -486,7 +488,22 @@ dialog h3 {
   }
 
   .print-footer {
-    margin-top: 12mm;
+    position: fixed;
+    right: 0;
+    bottom: -16mm;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 5mm;
+    border-top: 0.5pt solid #d7dee2;
+    padding-top: 3mm;
+    color: #687078;
+    font-size: 7.5pt;
+    line-height: 1.2;
+  }
+
+  .print-payment-note {
+    margin-top: 10mm;
     font-size: 9pt;
     line-height: 1.45;
   }

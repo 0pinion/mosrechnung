@@ -26,6 +26,7 @@ SETTING_NAMES = {
     "companyBic": "company_bic",
     "companyTaxOffice": "company_tax_office",
     "companyTaxNumber": "company_tax_number",
+    "companyVatId": "company_vat_id",
     "companyPhone": "company_phone",
     "companyEmail": "company_email",
     "invoicePattern": "invoice_number_pattern",

@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "company_bic": "",
     "company_tax_office": "",
     "company_tax_number": "",
+    "company_vat_id": "",
     "company_phone": "",
     "company_email": "",
     "company_logo": "",

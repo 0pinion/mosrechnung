@@ -12,7 +12,10 @@ def populated_repository(path):
     repository = Repository(path)
     customer = repository.save_customer(Customer("Anna Müller", "Dorfstraße 1", "12345", "Dorf", "123", "Bello"))
     service = repository.save_service(Service("Hundetraining", 2500))
-    repository.save_settings({"company_name": "Hundeschule", "invoice_tax_rate": "19"})
+    repository.save_settings({
+        "company_name": "Hundeschule", "company_vat_id": "DE123456789",
+        "invoice_tax_rate": "19",
+    })
     repository.save_invoice(Invoice(
         "RG001/2026", date(2026, 9, 8), customer.id, customer.name, customer.address,
         customer.phone, customer.dog_names,
@@ -31,6 +34,7 @@ def test_export_is_compatible_with_webapp_format(tmp_path):
     assert data["services"][0]["priceCents"] == 2500
     assert data["invoices"][0]["totalCents"] == 5474
     assert data["settings"]["companyName"] == "Hundeschule"
+    assert data["settings"]["companyVatId"] == "DE123456789"
 
 
 def test_round_trip_replaces_database(tmp_path):
@@ -46,6 +50,7 @@ def test_round_trip_replaces_database(tmp_path):
     assert invoice.number == "RG001/2026"
     assert invoice.items[0].unit_price_cents == 2300
     assert invoice.tax_rate_percent == 19
+    assert target.get_settings()["company_vat_id"] == "DE123456789"
 
 
 def test_invalid_backup_does_not_change_database(tmp_path):

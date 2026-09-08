@@ -326,6 +326,7 @@ class SettingsWidget(QScrollArea):
         self.company_bic = QLineEdit()
         self.company_tax_office = QLineEdit()
         self.company_tax = QLineEdit()
+        self.company_vat_id = QLineEdit()
         self.company_phone = QLineEdit()
         self.company_email = QLineEdit()
         self.logo = QLineEdit()
@@ -341,6 +342,7 @@ class SettingsWidget(QScrollArea):
         company_form.addRow("BIC *", self.company_bic)
         company_form.addRow("Zuständiges Finanzamt *", self.company_tax_office)
         company_form.addRow("Steuernummer *", self.company_tax)
+        company_form.addRow("Umsatzsteuer-ID *", self.company_vat_id)
         company_form.addRow("Telefon", self.company_phone)
         company_form.addRow("E-Mail", self.company_email)
         company_form.addRow("Logo", logo_row)
@@ -423,6 +425,7 @@ class SettingsWidget(QScrollArea):
         self.company_bic.setText(settings.get("company_bic", ""))
         self.company_tax_office.setText(settings.get("company_tax_office", ""))
         self.company_tax.setText(settings.get("company_tax_number", ""))
+        self.company_vat_id.setText(settings.get("company_vat_id", ""))
         self.company_phone.setText(settings.get("company_phone", ""))
         self.company_email.setText(settings.get("company_email", ""))
         self.logo.setText(settings.get("company_logo", ""))
@@ -443,6 +446,7 @@ class SettingsWidget(QScrollArea):
                 self.company_name.text(), self.company_address.toPlainText(), self.company_seat.text(),
                 self.company_iban.text(), self.company_bic.text(), self.company_tax_office.text(),
                 self.company_tax.text(),
+                self.company_vat_id.text(),
             )
             if any(not value.strip() for value in required_company_values):
                 raise ValueError("Bitte alle mit * markierten Firmendaten ausfüllen.")
@@ -465,6 +469,7 @@ class SettingsWidget(QScrollArea):
             "company_bic": self.company_bic.text().strip(),
             "company_tax_office": self.company_tax_office.text().strip(),
             "company_tax_number": self.company_tax.text().strip(),
+            "company_vat_id": self.company_vat_id.text().strip(),
             "company_phone": self.company_phone.text().strip(),
             "company_email": self.company_email.text().strip(),
             "company_logo": self.logo.text().strip(),

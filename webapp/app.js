@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   companyBic: "",
   companyTaxOffice: "",
   companyTaxNumber: "",
+  companyVatId: "",
   companyPhone: "",
   companyEmail: "",
   companyLogo: "",
@@ -297,19 +298,34 @@ function addInvoiceItem(item = {}) {
   const template = document.querySelector("#invoiceItemTemplate");
   const node = template.content.firstElementChild.cloneNode(true);
   const serviceSelect = node.querySelector("[name=serviceId]");
+  const description = node.querySelector("[name=description]");
+  const unitPrice = node.querySelector("[name=unitPrice]");
   serviceSelect.innerHTML = `<option value="">Individuell</option>` + state.services.map((service) => `
     <option value="${service.id}">${escapeHtml(service.description)}</option>
   `).join("");
-  serviceSelect.value = item.serviceId || "";
-  node.querySelector("[name=description]").value = item.description || "";
+  const isStoredItem = item.serviceId != null || item.description != null || item.unitPriceCents != null;
+  const defaultService = isStoredItem ? null : state.services[0];
+  serviceSelect.value = item.serviceId || defaultService?.id || "";
+  const selectedService = state.services.find((service) => String(service.id) === serviceSelect.value);
+  description.value = item.description ?? selectedService?.description ?? "";
   node.querySelector("[name=quantity]").value = item.quantity || 1;
-  node.querySelector("[name=unitPrice]").value = item.unitPriceCents != null ? textFromCents(item.unitPriceCents) : "";
+  unitPrice.value = item.unitPriceCents != null
+    ? textFromCents(item.unitPriceCents)
+    : selectedService ? textFromCents(selectedService.priceCents) : "";
+
+  const updateDescriptionVisibility = () => {
+    const usesPreset = state.services.some((service) => String(service.id) === serviceSelect.value);
+    description.hidden = usesPreset;
+    description.required = !usesPreset;
+  };
+  updateDescriptionVisibility();
   serviceSelect.addEventListener("change", () => {
     const service = state.services.find((entry) => String(entry.id) === serviceSelect.value);
     if (service) {
-      node.querySelector("[name=description]").value = service.description;
-      node.querySelector("[name=unitPrice]").value = textFromCents(service.priceCents);
+      description.value = service.description;
+      unitPrice.value = textFromCents(service.priceCents);
     }
+    updateDescriptionVisibility();
     updateInvoiceTotal();
   });
   node.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateInvoiceTotal));
@@ -498,12 +514,8 @@ function renderInvoicePrint(invoice) {
   const settings = state.settings;
   const missing = [
     ["companyName", "Firmenname"],
-    ["companyAddress", "Firmenanschrift"],
-    ["companySeat", "Firmensitz"],
     ["companyIban", "IBAN"],
-    ["companyBic", "BIC"],
-    ["companyTaxOffice", "Finanzamt"],
-    ["companyTaxNumber", "Steuernummer"],
+    ["companyVatId", "Umsatzsteuer-ID"],
   ].filter(([key]) => !String(settings[key] || "").trim());
   if (missing.length) {
     alert(`Bitte zuerst Einstellungen ausfuellen: ${missing.map((entry) => entry[1]).join(", ")}`);
@@ -511,15 +523,6 @@ function renderInvoicePrint(invoice) {
   }
   document.querySelector("#printArea").innerHTML = `
     <article class="invoice-print">
-      <header class="print-header">
-        <div>
-          <strong>${escapeHtml(settings.companyName)}</strong><br>
-          ${escapeHtml(settings.companyAddress).replace(/\n/g, "<br>")}
-          ${settings.companyPhone ? `<br>Telefon: ${escapeHtml(settings.companyPhone)}` : ""}
-          ${settings.companyEmail ? `<br>${escapeHtml(settings.companyEmail)}` : ""}
-        </div>
-        ${settings.companyLogo ? `<img class="print-logo" alt="" src="${settings.companyLogo}">` : ""}
-      </header>
       <section class="print-recipient">
         <strong>${escapeHtml(invoice.customerName)}</strong>
         ${invoice.customerDogs ? `<br><small>Hund: ${escapeHtml(invoice.customerDogs)}</small>` : ""}
@@ -548,16 +551,15 @@ function renderInvoicePrint(invoice) {
         <div><span>Umsatzsteuer ${invoice.taxRate} %</span><span>${money(invoice.taxCents)}</span></div>
         <div><strong>Bruttobetrag</strong><strong>${money(invoice.totalCents)}</strong></div>
       </section>
+      <section class="print-payment-note">
+        Lieferdatum entspricht Rechnungsdatum.<br>
+        Zahlbar sofort ohne Abzug.<br>
+        Bitte überweisen Sie den Gesamtbetrag auf das unten genannte Konto.
+      </section>
       <footer class="print-footer">
-        <p>Lieferdatum entspricht Rechnungsdatum.<br>Zahlbar sofort ohne Abzug.<br>Bitte überweisen Sie den Gesamtbetrag auf das unten genannte Konto.</p>
-        <p>
-          ${escapeHtml(settings.companyName)}<br>
-          ${escapeHtml(settings.companySeat)}<br>
-          IBAN: ${escapeHtml(settings.companyIban)}<br>
-          BIC: ${escapeHtml(settings.companyBic)}<br>
-          Zuständiges Finanzamt: ${escapeHtml(settings.companyTaxOffice)}<br>
-          Steuernummer: ${escapeHtml(settings.companyTaxNumber)}
-        </p>
+        <span>${escapeHtml(settings.companyName)}</span>
+        <span>IBAN ${escapeHtml(settings.companyIban)}</span>
+        <span>USt-IdNr. ${escapeHtml(settings.companyVatId)}</span>
       </footer>
     </article>
   `;
